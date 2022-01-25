@@ -33,6 +33,7 @@
 
 #include "esp_log.h"
 #include "core2forAWS.h"
+#include "lv_lib_qrcode/lv_qrcode.h"
 #include "ui.h"
 
 #define MAX_TEXTAREA_LENGTH 1024
