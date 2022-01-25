@@ -1,3 +1,0 @@
-[submodule "Blinky-Hello-World/components/thirdparty/lv_lib_qrcode"]
-	path = Blinky-Hello-World/components/thirdparty/lv_lib_qrcode
-	url = https://github.com/lvgl/lv_lib_qrcode.git
