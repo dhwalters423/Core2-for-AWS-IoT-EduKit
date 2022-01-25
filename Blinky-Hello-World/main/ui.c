@@ -33,7 +33,7 @@
 
 #include "esp_log.h"
 #include "core2forAWS.h"
-#include "lv_lib_qrcode/lv_qrcode.h"
+#include "../../components/thirdparty/lv_lib_qrcode/lv_qrcode.h"
 #include "ui.h"
 
 #define MAX_TEXTAREA_LENGTH 1024
@@ -89,6 +89,15 @@ void ui_wifi_label_update(bool state){
         lv_label_set_text(wifi_label, buffer);
     }
     xSemaphoreGive(xGuiSemaphore);
+}
+
+void ui_draw_qrcode(char* data) {
+    lv_obj_clean(lv_scr_act());
+
+    lv_obj_t * qr = lv_qrcode_create(lv_scr_act(), 225, lv_color_hex3(0x000), lv_color_hex3(0xeef));
+
+    /*Set data*/
+    lv_qrcode_update(qr, data, strlen(data));
 }
 
 void ui_init() {

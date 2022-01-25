@@ -236,6 +236,7 @@ void aws_iot_task(void *param) {
              client_id);
     
     ui_textarea_add("Attempting publish to: %s\n", base_publish_topic, BASE_PUBLISH_TOPIC_LEN) ;
+    ui_draw_qrcode("Hello world");
     while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
 
         //Max time the yield function will wait for read messages
