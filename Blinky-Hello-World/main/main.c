@@ -46,6 +46,8 @@
 #include "aws_iot_mqtt_client_interface.h"
 
 #include "core2forAWS.h"
+#include "tng_atcacert_client.h"
+#include "atca_basic.h"
 
 #include "wifi.h"
 #include "blink.h"
@@ -69,6 +71,35 @@ char HostAddress[255] = AWS_IOT_MQTT_HOST;
 
 /* Default MQTT port is pulled from the aws_iot_config.h */
 uint32_t port = AWS_IOT_MQTT_PORT;
+
+ATCA_STATUS get_cert_fingerprint(uint8_t* digest) {
+    size_t deviceCertSize = 0;
+    int ret;
+
+    // Get device cert size and allocate buffer
+    ret = tng_atcacert_read_device_cert(NULL, &deviceCertSize, NULL);
+    if (ret != ATCA_SUCCESS) {
+        ESP_LOGI(TAG, "*FAILED* Cert Sizing tng_atcacert_read_device_cert %02x", ret);
+        return ret;
+    }
+
+    uint8_t certBuffer[deviceCertSize];
+
+    // Get device cert
+    ret = tng_atcacert_read_device_cert(certBuffer, &deviceCertSize, NULL);
+    if (ret != ATCA_SUCCESS) {
+        ESP_LOGI(TAG, "*FAILED* Getting device cert tng_atcacert_read_device_cert %02x", ret);
+        return ret;
+    }
+
+    // Get sha256 fingerprint
+    ret = atcab_sha(deviceCertSize, certBuffer, digest);
+    if (ret != ATCA_SUCCESS) {
+        ESP_LOGI(TAG, "*FAILED* Sha256 hash atcab_cha %02x", ret);
+        return ret;
+    }
+    return ATCA_SUCCESS;
+}
 
 void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
                                     IoT_Publish_Message_Params *params, void *pData) {
@@ -236,7 +267,22 @@ void aws_iot_task(void *param) {
              client_id);
     
     ui_textarea_add("Attempting publish to: %s\n", base_publish_topic, BASE_PUBLISH_TOPIC_LEN) ;
-    ui_draw_qrcode("Hello world");
+
+    // Starting QR Code Display of cert fingerprint
+    uint8_t digest[32];
+    char *char_digest = malloc(sizeof(digest)*2 + 1);
+    ret = get_cert_fingerprint(digest);
+    if (ret != ATCA_SUCCESS) {
+        ESP_LOGI(TAG, "*FAILED* get_cert_fingerprint returned %02x", ret);
+    }
+
+    // Copy digest to char* array for display
+    for (int i=0; i < sizeof(digest); i++) {
+        sprintf(char_digest + i * 2, "%02x", digest[i]);
+    }
+    // Display the QR code
+    ui_draw_qrcode(char_digest);
+
     while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
 
         //Max time the yield function will wait for read messages
