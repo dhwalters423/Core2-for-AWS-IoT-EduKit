@@ -174,10 +174,6 @@ EP_STATUS get_iot_ep_host ( char *HostAddress, unsigned int len) {
 }
 
 
-
-
-
-
 void clear_ep(void)
 {
 
@@ -258,9 +254,10 @@ void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, ui
             cJSON *message = cJSON_Parse(params->payload);
             char *iot_ep = cJSON_GetObjectItem(message,"iotep")->valuestring;
             ESP_LOGI(TAG, "parsed iotep=%s", iot_ep);
-            //set_iot_ep_host()
-            //ESP_LOGI(TAG, "EP stored to NVM, rebooting...");
-            //esp_restart();
+            snprintf(HostAddress, sizeof(HostAddress), iot_ep);
+            set_iot_ep_host(HostAddress);
+            ESP_LOGI(TAG, "HostAddress set to %s.  Rebooting...", HostAddress);
+            esp_restart();
         }
     }
     
