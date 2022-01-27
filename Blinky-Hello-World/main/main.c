@@ -176,8 +176,11 @@ EP_STATUS get_iot_ep_host ( char *HostAddress, unsigned int len) {
 
 
 
-void rw_nvm(void)
+void clear_ep(void)
 {
+
+    //wipe the EP 
+
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -194,48 +197,13 @@ void rw_nvm(void)
     } else {
         printf("Done\n");
 
-        // Read
-        printf("Reading ep config from NVS ... ");
-        
-        const char* ep = "adtd7tm6r50x2.iot.us-west-2.amazonaws.com";
-        
-        char buf[strlen(ep) + 1];
-        size_t buf_len = sizeof(buf);
-
-        err = nvs_get_str(my_handle, "ep", buf, &buf_len);
-
-        // err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
-        switch (err) {
-            case ESP_OK:
-                printf("Done...\n");
-                printf("ep = %s\n", buf);
-                printf("now erase it\n");
-                err = nvs_erase_key(my_handle, "ep");
-                printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                printf("The value is not initialized yet!\n");
-                printf("Write ep in NVS ... ");
-                err = nvs_set_str(my_handle, "ep", ep);
-                printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
-                break;
-            default :
-                printf("Error (%s) reading!\n", esp_err_to_name(err));
-        }
-
-        // Commit written value.
-        // After setting any values, nvs_commit() must be called to ensure changes are written
-        // to flash storage. Implementations may write to storage at other times,
-        // but this is not guaranteed.
-        printf("Committing updates in NVS ... ");
+        err = nvs_erase_key(my_handle, "ep");
         err = nvs_commit(my_handle);
-        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+        printf((err != ESP_OK) ? "Failed to clear EP from NVM!\n" : "EP cleared!\n");
 
         // Close
         nvs_close(my_handle);
     }
-     printf("\n");
-    
 }
 
 
