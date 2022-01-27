@@ -89,6 +89,8 @@ char base_publish_topic[BASE_PUBLISH_TOPIC_LEN];
 char lobby_pub_topic[] = "$aws/rules/lobby_announce";
 char lobby_sub_topic[LOBBY_SUBSCRIBE_TOPIC_LEN];
 
+uint8_t digest[32];
+
 typedef enum {
  EP_NOT_FOUND,
  EP_GOOD,
@@ -326,6 +328,48 @@ static void publisher(AWS_IoT_Client *client, char *base_topic, uint16_t base_to
         ESP_LOGW(TAG, "QOS1 publish ack not received.");
         rc = SUCCESS;
     }
+
+    ESP_LOGI(TAG, "Published: %.*s\t%.*s", base_topic_len, base_topic, (int) paramsQOS1.payloadLen, (char *) paramsQOS1.payload);
+}
+
+// void create_commission_payload(char *cPayload){
+
+//     // char *string = NULL;
+//     // unsigned int len;
+
+//     cJSON *payload_json = cJSON_CreateObject();
+
+//     // if (cJSON_AddStringToObject(payload_json, "iotep", HostAddress) == NULL)
+//     // {
+//     //     goto end;
+//     // }
+//     cJSON_AddStringToObject(payload_json, "iotep", HostAddress);
+//     cPayload = cJSON_Print(payload_json);
+
+// // end:
+// //     cJSON_Delete(payload_json);
+// }
+
+static void commission_publisher(AWS_IoT_Client *client, char *base_topic, uint16_t base_topic_len){
+    // char cPayload[100];
+    // int32_t i = 0;
+    cJSON *payload_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(payload_json, "iotep", HostAddress);
+
+    IoT_Publish_Message_Params paramsQOS1;
+
+    paramsQOS1.qos = QOS1;
+    paramsQOS1.payload = cJSON_Print(payload_json);
+    // paramsQOS1.payload = (void *) cPayload;
+    paramsQOS1.isRetained = 0;
+    // Publish and check if "ack" was sent from AWS IoT Core
+    // create_commission_payload(cPayload);    
+    paramsQOS1.payloadLen = strlen(paramsQOS1.payload);
+    IoT_Error_t rc = aws_iot_mqtt_publish(client, base_topic, base_topic_len, &paramsQOS1);
+    if (rc == MQTT_REQUEST_TIMEOUT_ERROR) {
+        ESP_LOGW(TAG, "QOS1 publish ack not received.");
+        rc = SUCCESS;
+    }
 }
 
 void aws_iot_task(void *param) {
@@ -352,7 +396,7 @@ void aws_iot_task(void *param) {
         abort();
     }
     // Get Cert FP
-    uint8_t digest[32];
+
     char *char_digest = malloc(sizeof(digest)*2 + 1);
     ret = get_cert_fingerprint(digest);
     if (ret != ATCA_SUCCESS) {
@@ -455,7 +499,7 @@ void aws_iot_task(void *param) {
             ESP_LOGD(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
             vTaskDelay(pdMS_TO_TICKS(PUBLISH_INTERVAL_MS));
             
-            publisher(&client, lobby_pub_topic, LOBBY_PUBLISH_TOPIC_LEN);
+            commission_publisher(&client, lobby_pub_topic, LOBBY_PUBLISH_TOPIC_LEN);
         }
     } else {
         // EP found... go do our job as blinky
