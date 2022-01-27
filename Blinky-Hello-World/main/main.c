@@ -238,8 +238,8 @@ ATCA_STATUS get_cert_fingerprint(uint8_t* digest) {
 
 void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
                                     IoT_Publish_Message_Params *params, void *pData) {
-    ESP_LOGI(TAG, "Subscribe callback");
-    ESP_LOGI(TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
+    // ESP_LOGI(TAG, "Subscribe callback");
+    // ESP_LOGI(TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
     
     if (strstr(topicName, lobby_sub_topic) != NULL) {
         char reset_payload[] = "factory reset";
@@ -527,15 +527,26 @@ void aws_iot_task(void *param) {
             abort();
         }
 
-        ESP_LOGI(TAG, "Subscribing to '%s'", subscribe_topic);
-        rc = aws_iot_mqtt_subscribe(&client, subscribe_topic, strlen(subscribe_topic), QOS0, iot_subscribe_callback_handler, NULL);
+        // ESP_LOGI(TAG, "Subscribing to '%s'", subscribe_topic);
+        // rc = aws_iot_mqtt_subscribe(&client, subscribe_topic, strlen(subscribe_topic), QOS0, iot_subscribe_callback_handler, NULL);
+        // if(SUCCESS != rc) {
+        //     ui_textarea_add("Error subscribing\n", NULL, 0);
+        //     ESP_LOGE(TAG, "Error subscribing : %d ", rc);
+        //     abort();
+        // } else{
+        //     ui_textarea_add("Subscribed to topic: %s\n\n", subscribe_topic, SUBSCRIBE_TOPIC_LEN) ;
+        //     ESP_LOGI(TAG, "Subscribed to topic '%s'", subscribe_topic);
+        // }
+
+        ESP_LOGI(TAG, "Subscribing to '%s'", lobby_sub_topic);
+        rc = aws_iot_mqtt_subscribe(&client, lobby_sub_topic, strlen(lobby_sub_topic), QOS0, iot_subscribe_callback_handler, NULL);
         if(SUCCESS != rc) {
             ui_textarea_add("Error subscribing\n", NULL, 0);
             ESP_LOGE(TAG, "Error subscribing : %d ", rc);
             abort();
         } else{
-            ui_textarea_add("Subscribed to topic: %s\n\n", subscribe_topic, SUBSCRIBE_TOPIC_LEN) ;
-            ESP_LOGI(TAG, "Subscribed to topic '%s'", subscribe_topic);
+            ui_textarea_add("Subscribed to topic: %s\n\n", lobby_sub_topic, LOBBY_SUBSCRIBE_TOPIC_LEN) ;
+            ESP_LOGI(TAG, "Subscribed to topic '%s'", lobby_sub_topic);
         }
         
         ESP_LOGI(TAG, "\n****************************************\n*  AWS client Id - %s  *\n****************************************\n\n",
