@@ -53,6 +53,8 @@
 #include "blink.h"
 #include "ui.h"
 
+#include "nvs_flash.h"
+
 /* The time between each MQTT message publish in milliseconds */
 #define PUBLISH_INTERVAL_MS 3000
 
@@ -67,10 +69,175 @@ extern const uint8_t aws_root_ca_pem_start[] asm("_binary_aws_root_ca_pem_start"
 extern const uint8_t aws_root_ca_pem_end[] asm("_binary_aws_root_ca_pem_end");
 
 /* Default MQTT HOST URL is pulled from the aws_iot_config.h */
-char HostAddress[255] = AWS_IOT_MQTT_HOST;
+// char HostAddress[255] = AWS_IOT_MQTT_HOST;
+char HostAddress[255] = "auuv869v0wcg7-ats.iot.us-west-2.amazonaws.com";
 
 /* Default MQTT port is pulled from the aws_iot_config.h */
-uint32_t port = AWS_IOT_MQTT_PORT;
+// uint32_t port = AWS_IOT_MQTT_PORT;
+uint32_t port = 8883;
+
+#define CLIENT_ID_LEN (ATCA_SERIAL_NUM_SIZE * 2)
+#define SUBSCRIBE_TOPIC_LEN (CLIENT_ID_LEN + 3)
+#define BASE_PUBLISH_TOPIC_LEN (CLIENT_ID_LEN + 2)
+#define LOBBY_SUBSCRIBE_TOPIC_LEN (CLIENT_ID_LEN + 9)
+#define LOBBY_PUBLISH_TOPIC_LEN 27
+
+char subscribe_topic[SUBSCRIBE_TOPIC_LEN];
+char base_publish_topic[BASE_PUBLISH_TOPIC_LEN];
+char lobby_pub_topic[] = "$aws/rules/lobby_announce";
+char lobby_sub_topic[LOBBY_SUBSCRIBE_TOPIC_LEN];
+
+typedef enum {
+ EP_NOT_FOUND,
+ EP_GOOD,
+ EP_ERR   
+} EP_STATUS;
+
+
+EP_STATUS set_iot_ep_host ( char *HostAddress) {
+    
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+    // Open
+    printf("\n");
+    printf("Opening Non-Volatile Storage (NVS) handle... ");
+    nvs_handle_t my_handle;
+    err = nvs_open("epstorage", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+        return EP_ERR;
+    } else {
+        printf("Done\n");
+
+        err = nvs_set_str(my_handle, "ep", HostAddress);
+        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+        // Commit written value.
+        // After setting any values, nvs_commit() must be called to ensure changes are written
+        // to flash storage. Implementations may write to storage at other times,
+        // but this is not guaranteed.
+        printf("Committing updates in NVS ... ");
+        err = nvs_commit(my_handle);
+        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+        // Close
+        nvs_close(my_handle);
+        return EP_GOOD;
+    }
+}
+
+EP_STATUS get_iot_ep_host ( char *HostAddress, unsigned int len) {
+    esp_err_t err = nvs_flash_init();
+    ESP_ERROR_CHECK( err );
+    // Open
+    printf("\n");
+    printf("Opening Non-Volatile Storage (NVS) handle... ");
+    nvs_handle_t my_handle;
+    err = nvs_open("epstorage", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+        return EP_ERR;
+    } else {
+        printf("Done\n");
+
+        // Read
+        printf("Reading ep config from NVS ... ");
+      
+        err = nvs_get_str(my_handle, "ep", HostAddress, &len);
+        
+        // Close
+        nvs_close(my_handle);
+
+        switch (err) {
+            case ESP_OK:
+                printf("Done...ep host set to = %s\n", HostAddress);
+                return EP_NOT_FOUND;
+
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The value is not initialized yet!\n");
+                return EP_NOT_FOUND;
+
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+                return EP_ERR;
+           }
+    }
+
+}
+
+
+
+
+
+
+void rw_nvm(void)
+{
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+    // Open
+    printf("\n");
+    printf("Opening Non-Volatile Storage (NVS) handle... ");
+    nvs_handle_t my_handle;
+    err = nvs_open("epstorage", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+    } else {
+        printf("Done\n");
+
+        // Read
+        printf("Reading ep config from NVS ... ");
+        
+        const char* ep = "adtd7tm6r50x2.iot.us-west-2.amazonaws.com";
+        
+        char buf[strlen(ep) + 1];
+        size_t buf_len = sizeof(buf);
+
+        err = nvs_get_str(my_handle, "ep", buf, &buf_len);
+
+        // err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+        switch (err) {
+            case ESP_OK:
+                printf("Done...\n");
+                printf("ep = %s\n", buf);
+                printf("now erase it\n");
+                err = nvs_erase_key(my_handle, "ep");
+                printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The value is not initialized yet!\n");
+                printf("Write ep in NVS ... ");
+                err = nvs_set_str(my_handle, "ep", ep);
+                printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+        }
+
+        // Commit written value.
+        // After setting any values, nvs_commit() must be called to ensure changes are written
+        // to flash storage. Implementations may write to storage at other times,
+        // but this is not guaranteed.
+        printf("Committing updates in NVS ... ");
+        err = nvs_commit(my_handle);
+        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+        // Close
+        nvs_close(my_handle);
+    }
+     printf("\n");
+    
+}
+
 
 ATCA_STATUS get_cert_fingerprint(uint8_t* digest) {
     size_t deviceCertSize = 0;
@@ -105,6 +272,12 @@ void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, ui
                                     IoT_Publish_Message_Params *params, void *pData) {
     ESP_LOGI(TAG, "Subscribe callback");
     ESP_LOGI(TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
+    
+    if (strstr(topicName, lobby_sub_topic) != NULL) {
+        //TODO set the ep host from lobby payload
+        //set_iot_ep_host (HostAddress);
+    }
+    
     if (strstr(topicName, "/blink") != NULL) {
         // Get state of the FreeRTOS task, "blinkTask", using it's task handle.
         // Suspend or resume the task depending on the returned task state
@@ -188,10 +361,6 @@ void aws_iot_task(void *param) {
     mqttInitParams.pDeviceCertLocation = "#";
     mqttInitParams.pDevicePrivateKeyLocation = "#0";
     
-#define CLIENT_ID_LEN (ATCA_SERIAL_NUM_SIZE * 2)
-#define SUBSCRIBE_TOPIC_LEN (CLIENT_ID_LEN + 3)
-#define BASE_PUBLISH_TOPIC_LEN (CLIENT_ID_LEN + 2)
-
     char *client_id = malloc(CLIENT_ID_LEN + 1);
     ATCA_STATUS ret = Atecc608_GetSerialString(client_id);
     if (ret != ATCA_SUCCESS)
@@ -199,11 +368,24 @@ void aws_iot_task(void *param) {
         printf("Failed to get device serial from secure element. Error: %i", ret);
         abort();
     }
+    // Get Cert FP
+    uint8_t digest[32];
+    char *char_digest = malloc(sizeof(digest)*2 + 1);
+    ret = get_cert_fingerprint(digest);
+    if (ret != ATCA_SUCCESS) {
+        ESP_LOGI(TAG, "*FAILED* get_cert_fingerprint returned %02x", ret);
+    }
+    // Copy digest to char* array for QR display
+    for (int i=0; i < sizeof(digest); i++) {
+        sprintf(char_digest + i * 2, "%02x", digest[i]);
+    }
 
-    char subscribe_topic[SUBSCRIBE_TOPIC_LEN];
-    char base_publish_topic[BASE_PUBLISH_TOPIC_LEN];
+
     snprintf(subscribe_topic, SUBSCRIBE_TOPIC_LEN, "%s/#", client_id);
     snprintf(base_publish_topic, BASE_PUBLISH_TOPIC_LEN, "%s/", client_id);
+
+
+    snprintf(lobby_sub_topic, LOBBY_SUBSCRIBE_TOPIC_LEN, "lobby/%s", client_id);
 
     mqttInitParams.mqttCommandTimeout_ms = 20000;
     mqttInitParams.tlsHandshakeTimeout_ms = 5000;
@@ -224,80 +406,133 @@ void aws_iot_task(void *param) {
     connectParams.keepAliveIntervalInSec = 10;
     connectParams.isCleanSession = true;
     connectParams.MQTTVersion = MQTT_3_1_1;
-
     connectParams.pClientID = client_id;
     connectParams.clientIDLen = CLIENT_ID_LEN;
     connectParams.isWillMsgPresent = false;
+
     ui_textarea_add("Connecting to AWS IoT Core...\n", NULL, 0);
-    ESP_LOGI(TAG, "Connecting to AWS IoT Core at %s:%d", mqttInitParams.pHostURL, mqttInitParams.port);
-    do {
-        rc = aws_iot_mqtt_connect(&client, &connectParams);
+
+    EP_STATUS err = EP_ERR;
+    //Check to see if we need to go to the lobby to get commissioned
+    err = get_iot_ep_host (HostAddress, sizeof(HostAddress));
+    if ((err == EP_NOT_FOUND) || (err == EP_ERR)) {
+        // no EP found... connect to default lobby address
+
+        ESP_LOGI(TAG, "Connecting to AWS IoT DEVICE LOBBY at %s:%d", mqttInitParams.pHostURL, mqttInitParams.port);
+        do {
+            rc = aws_iot_mqtt_connect(&client, &connectParams);
+            if(SUCCESS != rc) {
+                ESP_LOGE(TAG, "Error(%d) connecting to %s:%d", rc, mqttInitParams.pHostURL, mqttInitParams.port);
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            }
+        } while(SUCCESS != rc);
+        ui_textarea_add("Successfully connected!\n", NULL, 0);
+        ESP_LOGI(TAG, "Successfully connected to AWS IoT Core!");
+
+        /*
+        * Enable Auto Reconnect functionality. Minimum and Maximum time for exponential backoff for retries.
+        *  #AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL
+        *  #AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL
+        */
+        rc = aws_iot_mqtt_autoreconnect_set_status(&client, true);
         if(SUCCESS != rc) {
-            ESP_LOGE(TAG, "Error(%d) connecting to %s:%d", rc, mqttInitParams.pHostURL, mqttInitParams.port);
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    } while(SUCCESS != rc);
-    ui_textarea_add("Successfully connected!\n", NULL, 0);
-    ESP_LOGI(TAG, "Successfully connected to AWS IoT Core!");
-
-    /*
-     * Enable Auto Reconnect functionality. Minimum and Maximum time for exponential backoff for retries.
-     *  #AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL
-     *  #AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL
-     */
-    rc = aws_iot_mqtt_autoreconnect_set_status(&client, true);
-    if(SUCCESS != rc) {
-        ui_textarea_add("Unable to set Auto Reconnect to true\n", NULL, 0);
-        ESP_LOGE(TAG, "Unable to set Auto Reconnect to true - %d", rc);
-        abort();
-    }
-
-    ESP_LOGI(TAG, "Subscribing to '%s'", subscribe_topic);
-    rc = aws_iot_mqtt_subscribe(&client, subscribe_topic, strlen(subscribe_topic), QOS0, iot_subscribe_callback_handler, NULL);
-    if(SUCCESS != rc) {
-        ui_textarea_add("Error subscribing\n", NULL, 0);
-        ESP_LOGE(TAG, "Error subscribing : %d ", rc);
-        abort();
-    } else{
-        ui_textarea_add("Subscribed to topic: %s\n\n", subscribe_topic, SUBSCRIBE_TOPIC_LEN) ;
-        ESP_LOGI(TAG, "Subscribed to topic '%s'", subscribe_topic);
-    }
-    
-    ESP_LOGI(TAG, "\n****************************************\n*  AWS client Id - %s  *\n****************************************\n\n",
-             client_id);
-    
-    ui_textarea_add("Attempting publish to: %s\n", base_publish_topic, BASE_PUBLISH_TOPIC_LEN) ;
-
-    // Starting QR Code Display of cert fingerprint
-    uint8_t digest[32];
-    char *char_digest = malloc(sizeof(digest)*2 + 1);
-    ret = get_cert_fingerprint(digest);
-    if (ret != ATCA_SUCCESS) {
-        ESP_LOGI(TAG, "*FAILED* get_cert_fingerprint returned %02x", ret);
-    }
-
-    // Copy digest to char* array for display
-    for (int i=0; i < sizeof(digest); i++) {
-        sprintf(char_digest + i * 2, "%02x", digest[i]);
-    }
-    // Display the QR code
-    ui_draw_qrcode(char_digest);
-
-    while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
-
-        //Max time the yield function will wait for read messages
-        rc = aws_iot_mqtt_yield(&client, 100);
-        if(NETWORK_ATTEMPTING_RECONNECT == rc) {
-            // If the client is attempting to reconnect we will skip the rest of the loop.
-            continue;
+            ui_textarea_add("Unable to set Auto Reconnect to true\n", NULL, 0);
+            ESP_LOGE(TAG, "Unable to set Auto Reconnect to true - %d", rc);
+            abort();
         }
 
-        ESP_LOGD(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
-        vTaskDelay(pdMS_TO_TICKS(PUBLISH_INTERVAL_MS));
+        ESP_LOGI(TAG, "Subscribing to '%s'", lobby_sub_topic);
+        rc = aws_iot_mqtt_subscribe(&client, lobby_sub_topic, strlen(lobby_sub_topic), QOS0, iot_subscribe_callback_handler, NULL);
+        if(SUCCESS != rc) {
+            ui_textarea_add("Error subscribing\n", NULL, 0);
+            ESP_LOGE(TAG, "Error subscribing : %d ", rc);
+            abort();
+        } else{
+            ui_textarea_add("Subscribed to topic: %s\n\n", lobby_sub_topic, LOBBY_SUBSCRIBE_TOPIC_LEN) ;
+            ESP_LOGI(TAG, "Subscribed to topic '%s'", lobby_sub_topic);
+        }
         
-        publisher(&client, base_publish_topic, BASE_PUBLISH_TOPIC_LEN);
-    }
+        ESP_LOGI(TAG, "\n****************************************\n*  AWS client Id - %s  *\n****************************************\n\n",
+                client_id);
+        
+        ui_textarea_add("Attempting publish to: %s\n", lobby_pub_topic, LOBBY_PUBLISH_TOPIC_LEN) ;
 
+        //Draw the QR code
+        ui_draw_qrcode(char_digest);
+
+        while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
+
+            //Max time the yield function will wait for read messages
+            rc = aws_iot_mqtt_yield(&client, 100);
+            if(NETWORK_ATTEMPTING_RECONNECT == rc) {
+                // If the client is attempting to reconnect we will skip the rest of the loop.
+                continue;
+            }
+
+            ESP_LOGD(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
+            vTaskDelay(pdMS_TO_TICKS(PUBLISH_INTERVAL_MS));
+            
+            publisher(&client, lobby_pub_topic, LOBBY_PUBLISH_TOPIC_LEN);
+        }
+    } else {
+        // EP found... go do our job as blinky
+
+        ESP_LOGI(TAG, "Connecting to AWS IoT Core at %s:%d", mqttInitParams.pHostURL, mqttInitParams.port);
+        do {
+            rc = aws_iot_mqtt_connect(&client, &connectParams);
+            if(SUCCESS != rc) {
+                ESP_LOGE(TAG, "Error(%d) connecting to %s:%d", rc, mqttInitParams.pHostURL, mqttInitParams.port);
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            }
+        } while(SUCCESS != rc);
+        ui_textarea_add("Successfully connected!\n", NULL, 0);
+        ESP_LOGI(TAG, "Successfully connected to AWS IoT Core!");
+
+        /*
+        * Enable Auto Reconnect functionality. Minimum and Maximum time for exponential backoff for retries.
+        *  #AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL
+        *  #AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL
+        */
+        rc = aws_iot_mqtt_autoreconnect_set_status(&client, true);
+        if(SUCCESS != rc) {
+            ui_textarea_add("Unable to set Auto Reconnect to true\n", NULL, 0);
+            ESP_LOGE(TAG, "Unable to set Auto Reconnect to true - %d", rc);
+            abort();
+        }
+
+        ESP_LOGI(TAG, "Subscribing to '%s'", subscribe_topic);
+        rc = aws_iot_mqtt_subscribe(&client, subscribe_topic, strlen(subscribe_topic), QOS0, iot_subscribe_callback_handler, NULL);
+        if(SUCCESS != rc) {
+            ui_textarea_add("Error subscribing\n", NULL, 0);
+            ESP_LOGE(TAG, "Error subscribing : %d ", rc);
+            abort();
+        } else{
+            ui_textarea_add("Subscribed to topic: %s\n\n", subscribe_topic, SUBSCRIBE_TOPIC_LEN) ;
+            ESP_LOGI(TAG, "Subscribed to topic '%s'", subscribe_topic);
+        }
+        
+        ESP_LOGI(TAG, "\n****************************************\n*  AWS client Id - %s  *\n****************************************\n\n",
+                client_id);
+        
+        ui_textarea_add("Attempting publish to: %s\n", base_publish_topic, BASE_PUBLISH_TOPIC_LEN) ;
+
+        while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
+
+            //Max time the yield function will wait for read messages
+            rc = aws_iot_mqtt_yield(&client, 100);
+            if(NETWORK_ATTEMPTING_RECONNECT == rc) {
+                // If the client is attempting to reconnect we will skip the rest of the loop.
+                continue;
+            }
+
+            ESP_LOGD(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
+            vTaskDelay(pdMS_TO_TICKS(PUBLISH_INTERVAL_MS));
+            
+            publisher(&client, base_publish_topic, BASE_PUBLISH_TOPIC_LEN);
+        }
+
+    };
+    
     ESP_LOGE(TAG, "An error occurred in the main loop.");
     abort();
 }
