@@ -155,7 +155,7 @@ EP_STATUS get_iot_ep_host ( char *HostAddress, unsigned int len) {
         switch (err) {
             case ESP_OK:
                 printf("Done...ep host set to = %s\n", HostAddress);
-                return EP_NOT_FOUND;
+                return EP_GOOD;
 
                 break;
             case ESP_ERR_NVS_NOT_FOUND:
