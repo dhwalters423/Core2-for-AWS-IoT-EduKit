@@ -242,8 +242,13 @@ void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, ui
     ESP_LOGI(TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
     
     if (strstr(topicName, lobby_sub_topic) != NULL) {
-        //TODO set the ep host from lobby payload
-        //set_iot_ep_host (HostAddress);
+        char reset_payload[] = "factory reset";
+        if (strstr(params->payload, reset_payload)){
+            ESP_LOGI(TAG, "Factory reset triggered!  EP cleared, rebooting...");
+            clear_ep();
+            ESP_LOGI(TAG, "EP cleared, rebooting...");
+            esp_restart();
+        }
     }
     
     if (strstr(topicName, "/blink") != NULL) {
