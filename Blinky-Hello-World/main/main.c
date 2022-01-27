@@ -55,6 +55,8 @@
 
 #include "nvs_flash.h"
 
+#include "cJSON.h"
+
 /* The time between each MQTT message publish in milliseconds */
 #define PUBLISH_INTERVAL_MS 3000
 
@@ -248,6 +250,17 @@ void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, ui
             clear_ep();
             ESP_LOGI(TAG, "EP cleared, rebooting...");
             esp_restart();
+        }
+
+       if (strstr(params->payload, "iotep")){
+            ESP_LOGI(TAG, "Commissioned EP received from Device Lobby");
+            //extract ep address from payload and set
+            cJSON *message = cJSON_Parse(params->payload);
+            char *iot_ep = cJSON_GetObjectItem(message,"iotep")->valuestring;
+            ESP_LOGI(TAG, "parsed iotep=%s", iot_ep);
+            //set_iot_ep_host()
+            //ESP_LOGI(TAG, "EP stored to NVM, rebooting...");
+            //esp_restart();
         }
     }
     
